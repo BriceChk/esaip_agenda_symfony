@@ -7,4 +7,6 @@
 /public/bundles/
 /var/
 /vendor/
+symfony.lock
+composer.lock
 ###< symfony/framework-bundle ###
