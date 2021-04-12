@@ -35,6 +35,11 @@ class User implements UserInterface, EncoderAwareInterface
      */
     private $password;
 
+    /**
+     * @ORM\Column(type="integer", nullable=true)
+     */
+    private $alcuinId;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -113,5 +118,17 @@ class User implements UserInterface, EncoderAwareInterface
 
     public function getEncoderName() {
         return 'app_encoder';
+    }
+
+    public function getAlcuinId(): ?int
+    {
+        return $this->alcuinId;
+    }
+
+    public function setAlcuinId(?int $alcuinId): self
+    {
+        $this->alcuinId = $alcuinId;
+
+        return $this;
     }
 }
