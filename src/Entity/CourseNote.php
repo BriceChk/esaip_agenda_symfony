@@ -3,7 +3,9 @@
 namespace App\Entity;
 
 use App\Repository\CourseNoteRepository;
+use DateTime;
 use Doctrine\ORM\Mapping as ORM;
+use JMS\Serializer\Annotation as Serializer;
 
 /**
  * @ORM\Entity(repositoryClass=CourseNoteRepository::class)
@@ -25,6 +27,7 @@ class CourseNote
     /**
      * @ORM\ManyToOne(targetEntity=CourseEvent::class, inversedBy="courseNotes")
      * @ORM\JoinColumn(nullable=false)
+     * @Serializer\Exclude()
      */
     private $event;
 
@@ -32,6 +35,10 @@ class CourseNote
      * @ORM\Column(type="datetime")
      */
     private $createdDate;
+
+    public function __construct() {
+        $this->createdDate = new DateTime();
+    }
 
     public function getId(): ?int
     {

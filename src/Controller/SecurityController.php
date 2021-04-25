@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\CourseEvent;
+use App\Entity\CourseNote;
 use App\Entity\User;
 use App\Utils;
 use DateInterval;
@@ -11,23 +12,29 @@ use Doctrine\ORM\EntityManagerInterface;
 use FOS\RestBundle\Controller\AbstractFOSRestController;
 use FOS\RestBundle\Controller\Annotations as Rest;
 use OpenApi\Annotations as OA;
+use Symfony\Bridge\Doctrine\Security\User\EntityUserProvider;
+use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Core\Authentication\Token\UsernamePasswordToken;
 use Symfony\Component\Security\Http\Event\InteractiveLoginEvent;
+use Symfony\Component\Security\Http\RememberMe\TokenBasedRememberMeServices;
+use Symfony\Component\Validator\Constraints\Date;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class SecurityController extends AbstractFOSRestController
 {
     private $em;
     private $client;
+    private $params;
     private $BASE_URL = 'https://esaip.alcuin.com/OpDotNet/Services';
 
-    public function __construct(EntityManagerInterface $em, HttpClientInterface $client) {
+    public function __construct(EntityManagerInterface $em, HttpClientInterface $client, ParameterBagInterface $params) {
         $this->em = $em;
         $this->client = $client;
+        $this->params = $params;
     }
 
     /**
@@ -98,7 +105,9 @@ class SecurityController extends AbstractFOSRestController
         $event = new InteractiveLoginEvent($request, $token);
         $dispatcher->dispatch($event);
 
-        $this->syncCourses();
+        $userProvider = new EntityUserProvider($this->getDoctrine(), 'App\Entity\User', 'username');
+
+        //new TokenBasedRememberMeServices(array($userProvider), $this->params->get('$secret'),'main', array());
 
         return $this->json([
             'username' => $user->getUsername(),
@@ -176,9 +185,104 @@ class SecurityController extends AbstractFOSRestController
             return $this->json([
                 'error' => 'User not connected',
             ], Response::HTTP_UNAUTHORIZED);
-        } else {
-            return $this->em->getRepository(CourseEvent::class)->findBy(['user' => $user], ['startsAt' => 'ASC']);
         }
+
+        return $this->em->getRepository(CourseEvent::class)->findBy(['user' => $user], ['startsAt' => 'ASC']);
+    }
+
+    /**
+     * @Rest\Post(path="/courses/{id}/notes", name="create_note", requirements = { "id"="\d+" })
+     * @Rest\View()
+     */
+    public function createNote($id, Request $request)
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        if (null == $user) {
+            return $this->json([
+                'error' => 'User not connected',
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $event = $this->em->getRepository(CourseEvent::class)->find($id);
+        if ($event == null || $event->getUser() != $user) {
+            return $this->json([
+                'error' => 'No event with this ID found for this user.',
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        $json = $request->request->all();
+        $note = new CourseNote();
+        $note->setContent($json['content']);
+        $note->setEvent($event);
+
+        $this->em->persist($note);
+        $this->em->flush();
+
+        return $note;
+    }
+
+    /**
+     * @Rest\Post(path="/notes/{id}", name="update_note", requirements = { "id"="\d+" })
+     * @Rest\View()
+     */
+    public function updateNote($id, Request $request)
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        if (null == $user) {
+            return $this->json([
+                'error' => 'User not connected',
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $note = $this->em->getRepository(CourseNote::class)->find($id);
+        if ($note == null || $note->getEvent()->getUser() != $user) {
+            return $this->json([
+                'error' => 'No note with this ID found for this user.',
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        $json = $request->request->all();
+        $note->setContent($json['content']);
+        $note->setCreatedDate(new DateTime());
+
+        $this->em->persist($note);
+        $this->em->flush();
+
+        return $note;
+    }
+
+    /**
+     * @Rest\Delete(path="/notes/{id}", name="delete_note", requirements = { "id"="\d+" })
+     * @Rest\View()
+     */
+    public function deleteNote($id)
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        if (null == $user) {
+            return $this->json([
+                'error' => 'User not connected',
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $note = $this->em->getRepository(CourseNote::class)->find($id);
+        if ($note == null || $note->getEvent()->getUser() != $user) {
+            return $this->json([
+                'error' => 'No note with this ID found for this user.',
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        $this->em->remove($note);
+        $this->em->flush();
+
+        return $this->json([
+            'success' => 'The note was successfully deleted.'
+        ]);
     }
 
     /**
@@ -262,7 +366,7 @@ class SecurityController extends AbstractFOSRestController
                     $event = new CourseEvent();
                 }
                 $event->setAlcuinId($e['id']);
-                $event->setName($e['projects'][0]);
+                $event->setName(substr($e['name'],0, 5) === 'Cours' ? $e['projects'][0] : $e['name']);
                 $event->setRoom(count($e['rooms']) > 0 ? join(', ', $e['rooms']) : 'Pas de salle');
                 $event->setTeacher(count($e['teachers']) > 0 ? $e['teachers'][0] : 'Pas de prof');
                 $event->setType($e['color'] == '#ffff00' ? 'Cours' : ($e['color'] == '#ff8080' ? 'Exam' : 'Autre'));
