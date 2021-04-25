@@ -3,7 +3,10 @@
 namespace App\Entity;
 
 use App\Repository\UserRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use JMS\Serializer\Annotation as Serializer;
 use Symfony\Component\Security\Core\Encoder\EncoderAwareInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 
@@ -30,15 +33,25 @@ class User implements UserInterface, EncoderAwareInterface
     private $roles = [];
 
     /**
-     * @var string The hashed password
-     * @ORM\Column(type="string")
+     * @var string
      */
-    private $password;
+    private $password = '';
 
     /**
-     * @ORM\Column(type="integer", nullable=true)
+     * @ORM\Column(type="string", length=32, nullable=true)
      */
-    private $alcuinId;
+    private $refreshToken;
+
+    /**
+     * @ORM\OneToMany(targetEntity=CourseEvent::class, mappedBy="user", orphanRemoval=true)
+     * @Serializer\Exclude()
+     */
+    private $courseEvents;
+
+    public function __construct()
+    {
+        $this->courseEvents = new ArrayCollection();
+    }
 
     public function getId(): ?int
     {
@@ -120,14 +133,44 @@ class User implements UserInterface, EncoderAwareInterface
         return 'app_encoder';
     }
 
-    public function getAlcuinId(): ?int
+    public function getRefreshToken(): ?string
     {
-        return $this->alcuinId;
+        return $this->refreshToken;
     }
 
-    public function setAlcuinId(?int $alcuinId): self
+    public function setRefreshToken(?string $refreshToken): self
     {
-        $this->alcuinId = $alcuinId;
+        $this->refreshToken = $refreshToken;
+
+        return $this;
+    }
+
+    /**
+     * @return Collection|CourseEvent[]
+     */
+    public function getCourseEvents(): Collection
+    {
+        return $this->courseEvents;
+    }
+
+    public function addCourseEvent(CourseEvent $courseEvent): self
+    {
+        if (!$this->courseEvents->contains($courseEvent)) {
+            $this->courseEvents[] = $courseEvent;
+            $courseEvent->setUser($this);
+        }
+
+        return $this;
+    }
+
+    public function removeCourseEvent(CourseEvent $courseEvent): self
+    {
+        if ($this->courseEvents->removeElement($courseEvent)) {
+            // set the owning side to null (unless already changed)
+            if ($courseEvent->getUser() === $this) {
+                $courseEvent->setUser(null);
+            }
+        }
 
         return $this;
     }

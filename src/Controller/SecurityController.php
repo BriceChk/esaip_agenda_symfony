@@ -2,28 +2,32 @@
 
 namespace App\Controller;
 
+use App\Entity\CourseEvent;
 use App\Entity\User;
-use App\Security\Encoder\MyPwdEncoder;
 use App\Utils;
+use DateInterval;
+use DateTime;
 use Doctrine\ORM\EntityManagerInterface;
 use FOS\RestBundle\Controller\AbstractFOSRestController;
 use FOS\RestBundle\Controller\Annotations as Rest;
 use OpenApi\Annotations as OA;
-use Symfony\Component\BrowserKit\HttpBrowser;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
-use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Core\Authentication\Token\UsernamePasswordToken;
 use Symfony\Component\Security\Http\Event\InteractiveLoginEvent;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class SecurityController extends AbstractFOSRestController
 {
     private $em;
+    private $client;
+    private $BASE_URL = 'https://esaip.alcuin.com/OpDotNet/Services';
 
-    public function __construct(EntityManagerInterface $em) {
+    public function __construct(EntityManagerInterface $em, HttpClientInterface $client) {
         $this->em = $em;
+        $this->client = $client;
     }
 
     /**
@@ -39,7 +43,6 @@ class SecurityController extends AbstractFOSRestController
      */
     public function login(Request $request, EventDispatcherInterface $dispatcher)
     {
-        $encoder = new MyPwdEncoder($this->getParameter('app.enc_key'));
         $response = new Response();
         $json = $request->request->all();
 
@@ -52,6 +55,31 @@ class SecurityController extends AbstractFOSRestController
         $username = $json['username'];
         $password = $json['password'];
 
+        $res = $this->client->request(
+            'POST',
+            $this->BASE_URL . '/OpenPortal.ServicesFundations.ContextOP/CreateTokensWithLogin.sopx',
+            [
+                'body' => [
+                    'login' => $username,
+                    'password' => $password,
+                    'isHashed' => 'false',
+                    'grant_type' => 'password',
+                    'clientName' => 'alcMobApp'
+                ]
+            ]
+        );
+
+        if ($res->getStatusCode() != 200) {
+            return $this->json([
+                'error' => "Wrong username or password",
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $json = $res->toArray();
+        $refreshToken = $json['refreshToken'];
+        $accessToken = $json['accessToken'];
+
+        // Storing the _actual_ good password and Alcuin ID
         $repo = $this->em->getRepository(User::class);
         $user = $repo->findOneBy(['username' => $username]);
 
@@ -59,44 +87,8 @@ class SecurityController extends AbstractFOSRestController
             // Register new user
             $user = new User();
             $user->setUsername($username);
-            $user->setPassword($encoder->encodePassword($password, null));
-            $this->em->persist($user);
-            $this->em->flush();
         }
-        $browser = new HttpBrowser(HttpClient::create());
-
-        // Authentifying to Alcuin
-        $browser->request('GET', 'https://esaip.alcuin.com/OpDotNet/Noyau/Login.aspx');
-        $browser->submitForm('Connexion', [
-            'UcAuthentification1$UcLogin1$txtLogin' => $username,
-            'UcAuthentification1$UcLogin1$txtPassword' => $password
-        ]);
-        $browser->request('GET', 'https://esaip.alcuin.com/OpDotNet/Context/context.jsx');
-
-        // Getting Alcuin user id
-        $r = $browser->getResponse()->getContent();
-        try {
-            $alcuinId = intval(explode('=', explode(';', $r)[0])[1]);
-        } catch (\Exception $e) {
-            return $this->json([
-                'error' => "Error while connecting to Alcuin.",
-            ], Response::HTTP_SERVICE_UNAVAILABLE);
-        }
-
-        // No alcuin id = bad credentials
-        if ($alcuinId == 0) {
-            if ($user->getAlcuinId() == null) {
-                $this->em->remove($user);
-                $this->em->flush();
-            }
-            return $this->json([
-                'error' => "Wrong username or password",
-            ], Response::HTTP_UNAUTHORIZED);
-        }
-
-        // Storing the _actual_ good password and Alcuin ID
-        $user->setPassword($encoder->encodePassword($password, null));
-        $user->setAlcuinId($alcuinId);
+        $user->setRefreshToken($refreshToken);
         $this->em->persist($user);
         $this->em->flush();
 
@@ -106,9 +98,11 @@ class SecurityController extends AbstractFOSRestController
         $event = new InteractiveLoginEvent($request, $token);
         $dispatcher->dispatch($event);
 
+        $this->syncCourses();
+
         return $this->json([
             'username' => $user->getUsername(),
-            'alcuin_id' => $user->getAlcuinId()
+            'refreshToken' => $user->getRefreshToken()
         ]);
     }
 
@@ -125,7 +119,7 @@ class SecurityController extends AbstractFOSRestController
         } else {
             return $this->json([
                 'username' => $user->getUsername(),
-                'alcuin_id' => $user->getAlcuinId(),
+                'refreshToken' => $user->getRefreshToken(),
             ]);
         }
     }
@@ -146,5 +140,170 @@ class SecurityController extends AbstractFOSRestController
     {
         // controller can be blank: it will never be executed!
         throw new \Exception('Don\'t forget to activate logout in security.yaml');
+    }
+
+    /**
+     * @Route("/delete-account", name="delete_account", methods={"POST"})
+     */
+    public function deleteAccount()
+    {
+        $user = $this->getUser();
+        $username = $user->getUsername();
+        if (null == $user) {
+            return $this->json([
+                'error' => 'User not connected',
+            ], Response::HTTP_UNAUTHORIZED);
+        } else {
+            $this->em->remove($user);
+            $this->em->flush();
+
+            return $this->json([
+                'success' => 'All user data was deleted for ' . $username,
+            ]);
+        }
+    }
+
+    /**
+     * @Rest\Get(path="/courses", name="show_courses")
+     * @Rest\View()
+     */
+    public function showCourses()
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        if (null == $user) {
+            return $this->json([
+                'error' => 'User not connected',
+            ], Response::HTTP_UNAUTHORIZED);
+        } else {
+            return $this->em->getRepository(CourseEvent::class)->findBy(['user' => $user], ['startsAt' => 'ASC']);
+        }
+    }
+
+    /**
+     * @Rest\Post(path="/sync-courses", name="sync_courses")
+     * @Rest\View()
+     */
+    public function syncCourses()
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        if (null == $user) {
+            return $this->json([
+                'error' => 'User not connected',
+            ], Response::HTTP_UNAUTHORIZED);
+        } else {
+            $accessToken = $this->getAccessToken($user->getRefreshToken());
+            if ($accessToken == null) {
+                return $this->json([
+                    'error' => 'An error occured while getting an access token.',
+                ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+            $now = new DateTime();
+            $year = intval($now->format('Y'));
+            $month = intval($now->format('n'));
+
+            if ($month >= 8) {
+                $year += 1;
+            }
+
+            // TODO Jusqu'à la fin de l'année $endDate = new DateTime($year . '-07-15T00:00:00');
+
+
+            $start = $now->format('Y-m-d\T08:00:00');
+
+            $endDate = $now->add(new DateInterval('P60D'));
+            $end = $endDate->format('Y-m-d\T23:59:59');
+
+            $res = $this->client->request(
+                'POST',
+                $this->BASE_URL . '/OpenPortal.Entities.AppMobile.Agenda.IEventUIMobileServices%5EOpenPortal.Entities/GetEventsInRange.sopx',
+                [
+                    'body' => [
+                        'StartDate' => $start,
+                        'FinalDate' => $end,
+                        'LastSync' => $start,
+                    ],
+                    'headers' => [
+                        'Authorization' => 'Bearer ' . $accessToken
+                    ]
+                ]
+            );
+
+            if ($res->getStatusCode() != 200) {
+                return $this->json([
+                    'error' => "An error occured while getting the course events.",
+                    'token' => $accessToken,
+                    'startsAt' => $start,
+                    'endsAt' => $end,
+                    'content' => $res->getContent(false)
+                ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+            $eventsRepo = $this->em->getRepository(CourseEvent::class);
+
+            // Suppression des événements + vieux d'un mois
+            $events = $eventsRepo->findOlderThanAMonth($user);
+            foreach ($events as $event) {
+                $this->em->remove($event);
+            }
+            $this->em->flush();
+
+            // Création / mise à jour des événements Alcuin
+            $json = $res->toArray();
+            $events = $json['Upsert'];
+            $idsList = [];
+            foreach ($events as $e) {
+                $event = $eventsRepo->findOneBy(['alcuinId' => $e['id'], 'user' => $user]);
+                if ($event == null) {
+                    $event = new CourseEvent();
+                }
+                $event->setAlcuinId($e['id']);
+                $event->setName($e['projects'][0]);
+                $event->setRoom(count($e['rooms']) > 0 ? join(', ', $e['rooms']) : 'Pas de salle');
+                $event->setTeacher(count($e['teachers']) > 0 ? $e['teachers'][0] : 'Pas de prof');
+                $event->setType($e['color'] == '#ffff00' ? 'Cours' : ($e['color'] == '#ff8080' ? 'Exam' : 'Autre'));
+                $event->setUser($user);
+                $event->setStartsAt(new DateTime(explode('+', $e['startsAt'])[0]));
+                $event->setEndsAt(new DateTime(explode('+', $e['endsAt'])[0]));
+                $this->em->persist($event);
+                $idsList[] = $event->getAlcuinId();
+            }
+
+            // Suppression des événements futurs n'existant plus
+            $events = $eventsRepo->findAfterToday($user);
+            foreach ($events as $e) {
+                if (!in_array($e->getAlcuinId(), $idsList)) {
+                    $this->em->remove($e);
+                }
+            }
+
+            $this->em->flush();
+
+            return $eventsRepo->findBy(['user' => $user]);
+        }
+    }
+
+    private function getAccessToken($refreshToken)
+    {
+        $res = $this->client->request(
+            'POST',
+            $this->BASE_URL . '/OpenPortal.ServicesFundations.ContextOP/CreateAccessWithRefresh.sopx',
+            [
+                'body' => [
+                    'grant_type' => 'refresh_token',
+                    'clientName' => 'alcMobApp',
+                    'refreshToken' => $refreshToken
+                ]
+            ]
+        );
+        if ($res->getStatusCode() != 200) {
+            return null;
+        }
+        $json = $res->toArray();
+        return $json['accessToken'];
     }
 }

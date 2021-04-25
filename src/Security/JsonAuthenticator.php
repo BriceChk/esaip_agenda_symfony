@@ -78,7 +78,7 @@ class JsonAuthenticator extends AbstractGuardAuthenticator implements PasswordAu
     {
         // todo check if alcuin login works
         // pour check depuis le user :
-        return $this->passwordEncoder->isPasswordValid($user->getPassword(), $credentials['password'] . 'test', null);
+        return $this->passwordEncoder->isPasswordValid($user->getPassword(), $credentials['password'], null);
     }
 
     public function onAuthenticationFailure(Request $request, AuthenticationException $exception)
