@@ -152,6 +152,47 @@ class SecurityController extends AbstractFOSRestController
     }
 
     /**
+     * @Rest\Get(path="/grades", name="show_grades")
+     */
+    public function showGrades()
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        if (null == $user) {
+            return $this->json([
+                'error' => 'User not connected',
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $accessToken = $this->getAccessToken($user->getRefreshToken());
+        if ($accessToken == null) {
+            return $this->json([
+                'error' => 'An error occured while getting an access token.',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        $res = $this->client->request(
+            'POST',
+            $this->BASE_URL . '/OpenPortal.Entities.AppMobile.Grades.IGradeUIMobileServices%5EOpenPortal.Entities/GetNotesStagiaire.sopx',
+            [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $accessToken
+                ]
+            ]
+        );
+
+        if ($res->getStatusCode() != 200) {
+            return $this->json([
+                'error' => "An error occured while getting the grades.",
+                'content' => $res->getContent(false)
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        return $this->json($res->toArray());
+    }
+
+    /**
      * @Route("/delete-account", name="delete_account", methods={"POST"})
      */
     public function deleteAccount()
