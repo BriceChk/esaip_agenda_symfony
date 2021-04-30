@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Repository\CourseEventRepository;
+use DateTimeInterface;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -89,24 +90,24 @@ class CourseEvent
         return $this;
     }
 
-    public function getStartsAt(): ?\DateTimeInterface
+    public function getStartsAt(): ?DateTimeInterface
     {
         return $this->startsAt;
     }
 
-    public function setStartsAt(\DateTimeInterface $startsAt): self
+    public function setStartsAt(DateTimeInterface $startsAt): self
     {
         $this->startsAt = $startsAt;
 
         return $this;
     }
 
-    public function getEndsAt(): ?\DateTimeInterface
+    public function getEndsAt(): ?DateTimeInterface
     {
         return $this->endsAt;
     }
 
-    public function setEndsAt(\DateTimeInterface $endsAt): self
+    public function setEndsAt(DateTimeInterface $endsAt): self
     {
         $this->endsAt = $endsAt;
 

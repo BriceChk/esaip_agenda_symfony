@@ -4,6 +4,7 @@ namespace App\Entity;
 
 use App\Repository\CourseNoteRepository;
 use DateTime;
+use DateTimeInterface;
 use Doctrine\ORM\Mapping as ORM;
 use JMS\Serializer\Annotation as Serializer;
 
@@ -69,12 +70,12 @@ class CourseNote
         return $this;
     }
 
-    public function getCreatedDate(): ?\DateTimeInterface
+    public function getCreatedDate(): ?DateTimeInterface
     {
         return $this->createdDate;
     }
 
-    public function setCreatedDate(\DateTimeInterface $createdDate): self
+    public function setCreatedDate(DateTimeInterface $createdDate): self
     {
         $this->createdDate = $createdDate;
 
