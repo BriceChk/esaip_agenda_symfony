@@ -11,7 +11,6 @@ use DateTime;
 use Doctrine\ORM\EntityManagerInterface;
 use FOS\RestBundle\Controller\AbstractFOSRestController;
 use FOS\RestBundle\Controller\Annotations as Rest;
-use OpenApi\Annotations as OA;
 use Symfony\Bridge\Doctrine\Security\User\EntityUserProvider;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
@@ -19,9 +18,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Core\Authentication\Token\UsernamePasswordToken;
-use Symfony\Component\Security\Http\Event\InteractiveLoginEvent;
 use Symfony\Component\Security\Http\RememberMe\TokenBasedRememberMeServices;
-use Symfony\Component\Validator\Constraints\Date;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class SecurityController extends AbstractFOSRestController
@@ -39,10 +36,6 @@ class SecurityController extends AbstractFOSRestController
 
     /**
      * Login with Alcuin id.
-     * @OA\RequestBody(
-     *     description="The Alcuin username and password in a JSON object",
-     *     @OA\JsonContent()
-     * )
      * @Rest\Post(
      *     path = "/login",
      *     name = "login",
@@ -61,6 +54,35 @@ class SecurityController extends AbstractFOSRestController
 
         $username = $json['username'];
         $password = $json['password'];
+
+        // TEST USER (NO PASSWORD)
+        if ($username == 'test.ing2022') {
+            $repo = $this->em->getRepository(User::class);
+            $user = $repo->findOneBy(['username' => $username]);
+
+            $token = new UsernamePasswordToken($user, $password, "main", $user->getRoles());
+
+            $userProvider = new EntityUserProvider($this->getDoctrine(), 'App\Entity\User', 'username');
+
+            $rememberMeService = new TokenBasedRememberMeServices(array($userProvider), $this->params->get('kernel.secret'),'main', array(
+                    'path' => '/',
+                    'name' => 'REMEMBERME',
+                    'domain' => null,
+                    'secure' => false,
+                    'httponly' => true,
+                    'lifetime' => 14515200, // 14 days
+                    'always_remember_me' => true,
+                    'remember_me_parameter' => '_remember_me')
+            );
+
+            $response = $this->json([
+                'username' => $user->getUsername(),
+                'refreshToken' => $user->getRefreshToken()
+            ]);
+
+            $rememberMeService->loginSuccess($request, $response, $token);
+            return $response;
+        }
 
         $res = $this->client->request(
             'POST',
@@ -100,19 +122,32 @@ class SecurityController extends AbstractFOSRestController
         $this->em->flush();
 
         $token = new UsernamePasswordToken($user, $password, "main", $user->getRoles());
-        $this->get('security.token_storage')->setToken($token);
+        //$this->get('security.token_storage')->setToken($token);
 
-        $event = new InteractiveLoginEvent($request, $token);
-        $dispatcher->dispatch($event);
+        //$event = new InteractiveLoginEvent($request, $token);
+        //$dispatcher->dispatch($event);
 
         $userProvider = new EntityUserProvider($this->getDoctrine(), 'App\Entity\User', 'username');
 
-        //new TokenBasedRememberMeServices(array($userProvider), $this->params->get('$secret'),'main', array());
+        $rememberMeService = new TokenBasedRememberMeServices(array($userProvider), $this->params->get('kernel.secret'),'main', array(
+                'path' => '/',
+                'name' => 'REMEMBERME',
+                'domain' => null,
+                'secure' => false,
+                'httponly' => true,
+                'lifetime' => 14515200, // 14 days
+                'always_remember_me' => true,
+                'remember_me_parameter' => '_remember_me')
+        );
 
-        return $this->json([
+        $response = $this->json([
             'username' => $user->getUsername(),
-            'refreshToken' => $user->getRefreshToken()
+            'refreshToken' => $user->getRefreshToken(),
+            'eventCount' => $user->getCourseEvents()->count()
         ]);
+
+        $rememberMeService->loginSuccess($request, $response, $token);
+        return $response;
     }
 
     /**
@@ -129,6 +164,7 @@ class SecurityController extends AbstractFOSRestController
             return $this->json([
                 'username' => $user->getUsername(),
                 'refreshToken' => $user->getRefreshToken(),
+                'eventCount' => $user->getCourseEvents()->count()
             ]);
         }
     }

@@ -13,7 +13,6 @@
         "doctrine/orm": "^2.8",
         "friendsofsymfony/rest-bundle": "^3.0",
         "jms/serializer-bundle": "^3.9",
-        "nelmio/api-doc-bundle": "^4.2",
         "nelmio/cors-bundle": "^2.1",
         "sensio/framework-extra-bundle": "^6.1",
         "symfony/apache-pack": "^1.0",
@@ -27,7 +26,6 @@
         "symfony/mime": "5.2.*",
         "symfony/proxy-manager-bridge": "5.2.*",
         "symfony/security-bundle": "5.2.*",
-        "symfony/twig-bundle": "5.2.*",
         "symfony/validator": "5.2.*",
         "symfony/yaml": "5.2.*"
     },

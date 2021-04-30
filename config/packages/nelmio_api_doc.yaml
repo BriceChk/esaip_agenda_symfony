@@ -1,9 +1,0 @@
-nelmio_api_doc:
-    documentation:
-        info:
-            title: Agenda ESAIP
-            description: This app allow ESAIP Students to synchronize their agenda on an Android/iOS app.
-            version: 1.0.0
-    areas: # to filter documented areas
-        path_patterns:
-            - ^/api(?!/doc$) # Accepts routes under /api except /api/doc
