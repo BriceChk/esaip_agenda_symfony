@@ -77,7 +77,8 @@ class SecurityController extends AbstractFOSRestController
 
             $response = $this->json([
                 'username' => $user->getUsername(),
-                'refreshToken' => $user->getRefreshToken()
+                'refreshToken' => $user->getRefreshToken(),
+                'eventCount' => $user->getCourseEvents()->count()
             ]);
 
             $rememberMeService->loginSuccess($request, $response, $token);
@@ -391,7 +392,7 @@ class SecurityController extends AbstractFOSRestController
                 $year += 1;
             }
 
-            // TODO Jusqu'à la fin de l'année $endDate = new DateTime($year . '-07-15T00:00:00');
+            // Jusqu'à la fin de l'année $endDate = new DateTime($year . '-07-15T00:00:00');
 
 
             $start = $now->format('Y-m-d\T08:00:00');
