@@ -395,7 +395,7 @@ class SecurityController extends AbstractFOSRestController
             // Jusqu'à la fin de l'année $endDate = new DateTime($year . '-07-15T00:00:00');
 
 
-            $start = $now->format('Y-m-d\T08:00:00');
+            $start = $now->sub(new DateInterval('P1D'))->format('Y-m-d\T08:00:00');
 
             $endDate = $now->add(new DateInterval('P60D'));
             $end = $endDate->format('Y-m-d\T23:59:59');
