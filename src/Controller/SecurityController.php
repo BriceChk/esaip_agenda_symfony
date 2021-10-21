@@ -35,8 +35,8 @@ class SecurityController extends AbstractFOSRestController
         $this->params = $params;
     }
 
-    private function jsonResp(array $body): JsonResponse {
-        return $this->json($body, 200, [
+    private function jsonResp(array $body, int $code = 200): JsonResponse {
+        return $this->json($body, $code, [
             'Access-Control-Allow-Credentials' => 'true'
         ]);
     }
