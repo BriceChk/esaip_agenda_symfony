@@ -14,6 +14,7 @@ use FOS\RestBundle\Controller\Annotations as Rest;
 use Symfony\Bridge\Doctrine\Security\User\EntityUserProvider;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
@@ -32,6 +33,12 @@ class SecurityController extends AbstractFOSRestController
         $this->em = $em;
         $this->client = $client;
         $this->params = $params;
+    }
+
+    private function jsonResp(array $body): JsonResponse {
+        return $this->json($body, 200, [
+            'Access-Control-Allow-Credentials' => true
+        ]);
     }
 
     /**
@@ -75,7 +82,7 @@ class SecurityController extends AbstractFOSRestController
                     'remember_me_parameter' => '_remember_me')
             );
 
-            $response = $this->json([
+            $response = $this->jsonResp([
                 'username' => $user->getUsername(),
                 'refreshToken' => $user->getRefreshToken(),
                 'eventCount' => $user->getCourseEvents()->count()
@@ -100,7 +107,7 @@ class SecurityController extends AbstractFOSRestController
         );
 
         if ($res->getStatusCode() != 200) {
-            return $this->json([
+            return $this->jsonResp([
                 'error' => "Wrong username or password",
             ], Response::HTTP_UNAUTHORIZED);
         }
@@ -141,7 +148,7 @@ class SecurityController extends AbstractFOSRestController
                 'remember_me_parameter' => '_remember_me')
         );
 
-        $response = $this->json([
+        $response = $this->jsonResp([
             'username' => $user->getUsername(),
             'refreshToken' => $user->getRefreshToken(),
             'eventCount' => $user->getCourseEvents()->count()
@@ -158,11 +165,11 @@ class SecurityController extends AbstractFOSRestController
         $user = $this->getUser();
 
         if (null == $user) {
-            return $this->json([
+            return $this->jsonResp([
                 'error' => 'User not connected',
             ], Response::HTTP_UNAUTHORIZED);
         } else {
-            return $this->json([
+            return $this->jsonResp([
                 'username' => $user->getUsername(),
                 'refreshToken' => $user->getRefreshToken(),
                 'eventCount' => $user->getCourseEvents()->count()
@@ -174,7 +181,7 @@ class SecurityController extends AbstractFOSRestController
      * @Route("/error", name="error")
      */
     public function error() {
-        return $this->json([
+        return $this->jsonResp([
             'error' => "An error occured",
         ]);
     }
@@ -197,14 +204,14 @@ class SecurityController extends AbstractFOSRestController
         $user = $this->getUser();
 
         if (null == $user) {
-            return $this->json([
+            return $this->jsonResp([
                 'error' => 'User not connected',
             ], Response::HTTP_UNAUTHORIZED);
         }
 
         $accessToken = $this->getAccessToken($user->getRefreshToken());
         if ($accessToken == null) {
-            return $this->json([
+            return $this->jsonResp([
                 'error' => 'An error occured while getting an access token.',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
@@ -220,13 +227,13 @@ class SecurityController extends AbstractFOSRestController
         );
 
         if ($res->getStatusCode() != 200) {
-            return $this->json([
+            return $this->jsonResp([
                 'error' => "An error occured while getting the grades.",
                 'content' => $res->getContent(false)
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
-        return $this->json($res->toArray());
+        return $this->jsonResp($res->toArray());
     }
 
     /**
@@ -237,14 +244,14 @@ class SecurityController extends AbstractFOSRestController
         $user = $this->getUser();
         $username = $user->getUsername();
         if (null == $user) {
-            return $this->json([
+            return $this->jsonResp([
                 'error' => 'User not connected',
             ], Response::HTTP_UNAUTHORIZED);
         } else {
             $this->em->remove($user);
             $this->em->flush();
 
-            return $this->json([
+            return $this->jsonResp([
                 'success' => 'All user data was deleted for ' . $username,
             ]);
         }
@@ -260,7 +267,7 @@ class SecurityController extends AbstractFOSRestController
         $user = $this->getUser();
 
         if (null == $user) {
-            return $this->json([
+            return $this->jsonResp([
                 'error' => 'User not connected',
             ], Response::HTTP_UNAUTHORIZED);
         }
@@ -278,14 +285,14 @@ class SecurityController extends AbstractFOSRestController
         $user = $this->getUser();
 
         if (null == $user) {
-            return $this->json([
+            return $this->jsonResp([
                 'error' => 'User not connected',
             ], Response::HTTP_UNAUTHORIZED);
         }
 
         $event = $this->em->getRepository(CourseEvent::class)->find($id);
         if ($event == null || $event->getUser() != $user) {
-            return $this->json([
+            return $this->jsonResp([
                 'error' => 'No event with this ID found for this user.',
             ], Response::HTTP_NOT_FOUND);
         }
@@ -311,14 +318,14 @@ class SecurityController extends AbstractFOSRestController
         $user = $this->getUser();
 
         if (null == $user) {
-            return $this->json([
+            return $this->jsonResp([
                 'error' => 'User not connected',
             ], Response::HTTP_UNAUTHORIZED);
         }
 
         $note = $this->em->getRepository(CourseNote::class)->find($id);
         if ($note == null || $note->getEvent()->getUser() != $user) {
-            return $this->json([
+            return $this->jsonResp([
                 'error' => 'No note with this ID found for this user.',
             ], Response::HTTP_NOT_FOUND);
         }
@@ -343,14 +350,14 @@ class SecurityController extends AbstractFOSRestController
         $user = $this->getUser();
 
         if (null == $user) {
-            return $this->json([
+            return $this->jsonResp([
                 'error' => 'User not connected',
             ], Response::HTTP_UNAUTHORIZED);
         }
 
         $note = $this->em->getRepository(CourseNote::class)->find($id);
         if ($note == null || $note->getEvent()->getUser() != $user) {
-            return $this->json([
+            return $this->jsonResp([
                 'error' => 'No note with this ID found for this user.',
             ], Response::HTTP_NOT_FOUND);
         }
@@ -358,7 +365,7 @@ class SecurityController extends AbstractFOSRestController
         $this->em->remove($note);
         $this->em->flush();
 
-        return $this->json([
+        return $this->jsonResp([
             'success' => 'The note was successfully deleted.'
         ]);
     }
@@ -373,13 +380,13 @@ class SecurityController extends AbstractFOSRestController
         $user = $this->getUser();
 
         if (null == $user) {
-            return $this->json([
+            return $this->jsonResp([
                 'error' => 'User not connected',
             ], Response::HTTP_UNAUTHORIZED);
         } else {
             $accessToken = $this->getAccessToken($user->getRefreshToken());
             if ($accessToken == null) {
-                return $this->json([
+                return $this->jsonResp([
                     'error' => 'An error occured while getting an access token.',
                 ], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
@@ -416,7 +423,7 @@ class SecurityController extends AbstractFOSRestController
             );
 
             if ($res->getStatusCode() != 200) {
-                return $this->json([
+                return $this->jsonResp([
                     'error' => "An error occured while getting the course events.",
                     'token' => $accessToken,
                     'startsAt' => $start,
