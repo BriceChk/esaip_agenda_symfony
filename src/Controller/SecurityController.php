@@ -37,7 +37,8 @@ class SecurityController extends AbstractFOSRestController
 
     private function jsonResp(array $body, int $code = 200): JsonResponse {
         return $this->json($body, $code, [
-            'Access-Control-Allow-Credentials' => 'true'
+            'Access-Control-Allow-Credentials' => 'true',
+            'Access-Control-Allow-Origin' => 'https://agendaesaip-app.bricechk.fr'
         ]);
     }
 
