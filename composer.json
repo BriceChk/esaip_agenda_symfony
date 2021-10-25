@@ -70,7 +70,8 @@
         "symfony": {
             "allow-contrib": false,
             "require": "5.2.*"
-        }
+        },
+        "public-dir": "public/api"
     },
     "require-dev": {
         "symfony/maker-bundle": "^1.30"
