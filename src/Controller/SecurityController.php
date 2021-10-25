@@ -40,6 +40,7 @@ class SecurityController extends AbstractFOSRestController
             'Access-Control-Allow-Credentials' => 'true',
             'Access-Control-Allow-Origin' => 'https://agendaesaip-app.bricechk.fr',
             'Content-Type' => 'application/json',
+            'Vary' => 'Origin'
         ]);
     }
 
