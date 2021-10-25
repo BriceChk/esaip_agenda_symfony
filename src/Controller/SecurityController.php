@@ -164,6 +164,7 @@ class SecurityController extends AbstractFOSRestController
      * @Route("/status", name="status")
      */
     public function loginStatus() {
+        /** @var User $user */
         $user = $this->getUser();
 
         if (null == $user) {
@@ -171,6 +172,7 @@ class SecurityController extends AbstractFOSRestController
                 'error' => 'User not connected',
             ], Response::HTTP_UNAUTHORIZED);
         } else {
+            $user->setLastLogin(new DateTime('NOW'));
             return $this->jsonResp([
                 'username' => $user->getUsername(),
                 'refreshToken' => $user->getRefreshToken(),

@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Repository\UserRepository;
+use DateTime;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -48,9 +49,15 @@ class User implements UserInterface, EncoderAwareInterface
      */
     private $courseEvents;
 
+    /**
+     * @ORM\Column(type="date")
+     */
+    private $lastLogin;
+
     public function __construct()
     {
         $this->courseEvents = new ArrayCollection();
+        $this->lastLogin = new DateTime('NOW');
     }
 
     public function getId(): ?int
@@ -171,6 +178,18 @@ class User implements UserInterface, EncoderAwareInterface
                 $courseEvent->setUser(null);
             }
         }
+
+        return $this;
+    }
+
+    public function getLastLogin(): ?\DateTimeInterface
+    {
+        return $this->lastLogin;
+    }
+
+    public function setLastLogin(\DateTimeInterface $lastLogin): self
+    {
+        $this->lastLogin = $lastLogin;
 
         return $this;
     }
