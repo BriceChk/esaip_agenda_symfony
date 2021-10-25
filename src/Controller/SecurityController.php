@@ -173,6 +173,8 @@ class SecurityController extends AbstractFOSRestController
             ], Response::HTTP_UNAUTHORIZED);
         } else {
             $user->setLastLogin(new DateTime('NOW'));
+            $this->em->persist($user);
+            $this->em->flush();
             return $this->jsonResp([
                 'username' => $user->getUsername(),
                 'refreshToken' => $user->getRefreshToken(),
