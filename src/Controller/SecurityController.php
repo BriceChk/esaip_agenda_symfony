@@ -51,13 +51,12 @@ class SecurityController extends AbstractFOSRestController
      */
     public function login(Request $request, EventDispatcherInterface $dispatcher)
     {
-        $response = new Response();
         $json = $request->request->all();
 
         if (!array_key_exists('username', $json) || !array_key_exists('password', $json)) {
-            $response->setStatusCode(Response::HTTP_BAD_REQUEST);
-            $response->setContent(Utils::jsonMsg("Username or password missing."));
-            return $response;
+            return $this->jsonResp([
+                'message' => 'Username or password missing'
+            ], Response::HTTP_BAD_REQUEST);
         }
 
         $username = $json['username'];
